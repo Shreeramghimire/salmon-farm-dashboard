@@ -73,7 +73,7 @@ Appen åpnes automatisk i nettleseren din på `http://localhost:8501/`
 ## ✍️ Forfatter
 
 **Shreeram Ghimire**
-Master i Akvakultur | Utvikler | Salmon Knowledge Center
+Master i Akvakultur | Utvikler | The Salmon Kunnskapssenter
 🔗 GitHub: [Shreeramghimire](https://github.com/Shreeramghimire)
 
 ---
