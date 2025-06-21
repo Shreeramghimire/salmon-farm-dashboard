@@ -32,25 +32,33 @@ if page == "📋 Data Entry":
         group = st.text_input("Group Name")
         date = st.date_input("Date")
         num_fish = st.number_input("Number of Fish", min_value=1, max_value=50, step=1)
-        data_types = st.multiselect("Select data types to record", 
-            ["Welfare Indicators", "Production Data", "Water Quality", "Lice Count"],
-            default=st.session_state.selected_data_types)
-        st.session_state.selected_data_types = data_types
 
-        if "Welfare Indicators" in data_types:
-            welfare_indicators = st.multiselect("Select Welfare Indicators", [
+        st.markdown("**Select Data Types to Record:**")
+        all_data_types = ["Welfare Indicators", "Production Data", "Water Quality", "Lice Count", "Product Quality"]
+        selected_data_types = []
+        for dtype in all_data_types:
+            if st.checkbox(dtype, value=dtype in st.session_state.selected_data_types):
+                selected_data_types.append(dtype)
+        st.session_state.selected_data_types = selected_data_types
+
+        if "Welfare Indicators" in selected_data_types:
+            st.markdown("**Select Welfare Indicators:**")
+            indicator_options = [
                 "Emaciation", "Scale Loss", "Fin Damage", "Wounds", "Eye Haemorrhaging",
                 "Exophthalmia", "Opercular Damage", "Snout Damage", "Upper Jaw Deformity",
                 "Lower Jaw Deformity", "Vertebral Deformity", "Skin Haemorrhages"
-            ], default=st.session_state.welfare_indicators)
-            st.session_state.welfare_indicators = welfare_indicators
+            ]
+            selected = []
+            for ind in indicator_options:
+                if st.checkbox(ind, value=ind in st.session_state.welfare_indicators):
+                    selected.append(ind)
+            st.session_state.welfare_indicators = selected
 
-        start = st.button("Start Recording")
-
-        if start:
+        col1, col2 = st.columns(2)
+        if col1.button("Start Recording"):
             st.session_state.group = group
             st.session_state.date = str(date)
-            st.session_state.data_types = data_types
+            st.session_state.data_types = selected_data_types
             st.session_state.max_fish = num_fish
             st.session_state.fish_data = []
             st.session_state.fish_index = 1
@@ -59,6 +67,11 @@ if page == "📋 Data Entry":
 
     else:
         st.subheader(f"📋 Score Table for {st.session_state.max_fish} Fish")
+
+        if st.button("🔙 Go Back to Selection"):
+            st.session_state.recording_started = False
+            st.rerun()
+
         form = st.form("bulk_entry_form")
         entries = []
 
