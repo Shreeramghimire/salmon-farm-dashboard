@@ -10,101 +10,95 @@ st.set_page_config(page_title="Salmonometer Dashboard", layout="wide")
 st.sidebar.title("🔧 Navigation")
 page = st.sidebar.radio("Go to", ["🏠 Home", "📋 Data Entry", "📊 Analytics"])
 
-# Session State
+# Session State Initialization
 if 'fish_index' not in st.session_state:
     st.session_state.fish_index = 1
 if 'fish_data' not in st.session_state:
     st.session_state.fish_data = []
 if 'max_fish' not in st.session_state:
     st.session_state.max_fish = 0
+if 'recording_started' not in st.session_state:
+    st.session_state.recording_started = False
+if 'selected_data_types' not in st.session_state:
+    st.session_state.selected_data_types = []
+if 'welfare_indicators' not in st.session_state:
+    st.session_state.welfare_indicators = []
 
 # 📋 Data Entry
 if page == "📋 Data Entry":
     st.title("📋 Data Entry - Fish by Fish")
 
-    if st.session_state.fish_index == 1:
-        with st.form("group_info_form"):
-            group = st.text_input("Group Name")
-            date = st.date_input("Date")
-            num_fish = st.number_input("Number of Fish", min_value=1, max_value=50, step=1)
-            data_types = st.multiselect("Select data types to record", 
-                                        ["Welfare Indicators", "Production Data", "Water Quality"])
-            welfare_indicators = []
-            if "Welfare Indicators" in data_types:
-                welfare_indicators = st.multiselect("Select Welfare Indicators", [
-                    "Emaciation", "Scale Loss", "Fin Damage", "Wounds", "Eye Haemorrhaging",
-                    "Exophthalmia", "Opercular Damage", "Snout Damage", "Upper Jaw Deformity",
-                    "Lower Jaw Deformity", "Vertebral Deformity", "Skin Haemorrhages"
-                ])
-            start = st.form_submit_button("Start Recording")
+    if not st.session_state.recording_started:
+        group = st.text_input("Group Name")
+        date = st.date_input("Date")
+        num_fish = st.number_input("Number of Fish", min_value=1, max_value=50, step=1)
+        data_types = st.multiselect("Select data types to record", 
+            ["Welfare Indicators", "Production Data", "Water Quality", "Lice Count"],
+            default=st.session_state.selected_data_types)
+        st.session_state.selected_data_types = data_types
+
+        if "Welfare Indicators" in data_types:
+            welfare_indicators = st.multiselect("Select Welfare Indicators", [
+                "Emaciation", "Scale Loss", "Fin Damage", "Wounds", "Eye Haemorrhaging",
+                "Exophthalmia", "Opercular Damage", "Snout Damage", "Upper Jaw Deformity",
+                "Lower Jaw Deformity", "Vertebral Deformity", "Skin Haemorrhages"
+            ], default=st.session_state.welfare_indicators)
+            st.session_state.welfare_indicators = welfare_indicators
+
+        start = st.button("Start Recording")
 
         if start:
             st.session_state.group = group
             st.session_state.date = str(date)
             st.session_state.data_types = data_types
-            st.session_state.welfare_indicators = welfare_indicators
             st.session_state.max_fish = num_fish
             st.session_state.fish_data = []
+            st.session_state.fish_index = 1
+            st.session_state.recording_started = True
             st.rerun()
 
     else:
-        st.subheader(f"🐟 Fish {st.session_state.fish_index} of {int(st.session_state.max_fish)}")
+        st.subheader(f"📋 Score Table for {st.session_state.max_fish} Fish")
+        form = st.form("bulk_entry_form")
+        entries = []
 
-        with st.form(f"fish_form_{st.session_state.fish_index}"):
-            entry = {
-                "Group": st.session_state.group,
-                "Date": st.session_state.date,
-                "Fish": st.session_state.fish_index
-            }
+        cols = ["Fish"] + st.session_state.welfare_indicators
+        if "Lice Count" in st.session_state.data_types:
+            cols.append("Lice Count")
 
-            if "Welfare Indicators" in st.session_state.data_types:
-                for indicator in st.session_state.welfare_indicators:
-                    with st.expander(f"📷 {indicator} (view guide)"):
-                        image_path = f"images/{indicator.lower().replace(' ', '_')}.jpg"
-                        if os.path.exists(image_path):
-                            st.image(image_path, caption=f"{indicator} scoring guide")
-                        else:
-                            st.warning(f"No image found for {indicator}")
-                    entry[indicator] = st.selectbox(f"{indicator} Score (0–3)", [0, 1, 2, 3], key=f"{indicator}_{st.session_state.fish_index}")
+        data = pd.DataFrame(columns=cols)
+        for i in range(1, int(st.session_state.max_fish) + 1):
+            row = {"Fish": i}
+            cols_display = st.columns(len(cols))
+            cols_display[0].write(f"{i}")
 
-            if "Production Data" in st.session_state.data_types:
-                entry["Weight (g)"] = st.number_input("Weight (g)", min_value=0.0)
-                entry["Length (cm)"] = st.number_input("Length (cm)", min_value=0.0)
+            for j, ind in enumerate(st.session_state.welfare_indicators):
+                row[ind] = cols_display[j+1].selectbox(f"{ind} (Fish {i})", [0, 1, 2, 3], key=f"{ind}_{i}")
 
-            if "Water Quality" in st.session_state.data_types:
-                entry["Temperature (°C)"] = st.number_input("Water Temp (°C)", min_value=0.0)
-                entry["Oxygen (mg/L)"] = st.number_input("Oxygen (mg/L)", min_value=0.0)
+            if "Lice Count" in st.session_state.data_types:
+                row["Lice Count"] = cols_display[len(cols_display)-1].number_input(f"Lice Count (Fish {i})", min_value=0, step=1, key=f"lice_{i}")
 
-            image = st.file_uploader("Upload image (optional)", type=["jpg", "jpeg", "png"])
-            entry["Image"] = image.name if image else "None"
+            entries.append(row)
 
-            submit = st.form_submit_button("Submit Fish Data")
-
+        submit = form.form_submit_button("Submit All Data")
         if submit:
-            st.session_state.fish_data.append(entry)
-            st.session_state.fish_index += 1
+            df = pd.DataFrame(entries)
+            df.insert(0, "Group", st.session_state.group)
+            df.insert(1, "Date", st.session_state.date)
+            st.session_state.fish_data = df
+            st.success("✅ All fish data recorded!")
+            st.dataframe(df)
 
-            if st.session_state.fish_index > st.session_state.max_fish:
-                st.success("✅ All fish data recorded!")
-                st.write("### Group Info")
-                st.write(f"Group: {st.session_state.group}")
-                st.write(f"Date: {st.session_state.date}")
-                st.write("### Recorded Data")
-                df = pd.DataFrame(st.session_state.fish_data)
-                st.dataframe(df)
+            # Download buttons
+            csv = df.to_csv(index=False).encode('utf-8')
+            st.download_button("⬇️ Download CSV", data=csv, file_name=f"{st.session_state.group}_fish_data.csv", mime='text/csv')
 
-                # Download buttons
-                csv = df.to_csv(index=False).encode('utf-8')
-                st.download_button("⬇️ Download CSV", data=csv, file_name=f"{st.session_state.group}_fish_data.csv", mime='text/csv')
+            xlsx_buffer = BytesIO()
+            with pd.ExcelWriter(xlsx_buffer, engine='xlsxwriter') as writer:
+                df.to_excel(writer, index=False, sheet_name='Fish Data')
+            st.download_button("⬇️ Download Excel", data=xlsx_buffer.getvalue(), file_name=f"{st.session_state.group}_fish_data.xlsx", mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
-                xlsx_buffer = BytesIO()
-                with pd.ExcelWriter(xlsx_buffer, engine='xlsxwriter') as writer:
-                    df.to_excel(writer, index=False, sheet_name='Fish Data')
-                    writer.save()
-                st.download_button("⬇️ Download Excel", data=xlsx_buffer.getvalue(), file_name=f"{st.session_state.group}_fish_data.xlsx", mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-
-            else:
-                st.rerun()
+            st.session_state.recording_started = False
 
 # 🏠 Home Page
 elif page == "🏠 Home":
