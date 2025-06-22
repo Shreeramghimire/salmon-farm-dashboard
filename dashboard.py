@@ -34,7 +34,7 @@ if page == "📋 Data Entry":
         num_fish = st.number_input("Number of Fish", min_value=1, max_value=50, step=1)
 
         st.markdown("**Select Data Types to Record:**")
-        all_data_types = ["Welfare Indicators", "Production Data", "Water Quality", "Lice Count", "Product Quality"]
+        all_data_types = ["Welfare Indicators", "Production Data", "Water Quality", "Lice Count"]
         selected_data_types = []
         for dtype in all_data_types:
             if st.checkbox(dtype, value=dtype in st.session_state.selected_data_types):
@@ -66,106 +66,143 @@ if page == "📋 Data Entry":
             st.rerun()
 
     else:
-        st.subheader(f"📋 Score Table for {st.session_state.max_fish} Fish")
+        if "Welfare Indicators" in st.session_state.data_types:
+            st.subheader("💫 Welfare Indicators Data Entry")
 
-        if st.button("🔙 Go Back to Selection"):
-            st.session_state.recording_started = False
-            st.rerun()
+            if st.button("🔙 Go Back to Selection"):
+                st.session_state.recording_started = False
+                st.rerun()
 
-        entries = []
+            entries = []
+            form = st.form("welfare_form")
+            with form:
+                for i in range(1, int(st.session_state.max_fish) + 1):
+                    row = {"Fish": i}
+                    cols = st.columns(len(st.session_state.welfare_indicators) + 1)
+                    cols[0].write(f"Fish {i}")
+                    for j, ind in enumerate(st.session_state.welfare_indicators):
+                        row[ind] = cols[j + 1].selectbox(f"{ind} (Fish {i})", [0, 1, 2, 3], key=f"{ind}_{i}")
+                    entries.append(row)
+                submit_welfare = form.form_submit_button("Submit Welfare Data")
+
+            if submit_welfare:
+                df = pd.DataFrame(entries)
+                df.insert(0, "Group", st.session_state.group)
+                df.insert(1, "Date", st.session_state.date)
+                st.success("✅ Welfare data recorded!")
+                st.dataframe(df)
+                csv = df.to_csv(index=False).encode('utf-8')
+                st.download_button("⬇️ Download CSV", data=csv, file_name=f"{st.session_state.group}_welfare.csv", mime='text/csv')
+                xlsx_buffer = BytesIO()
+                with pd.ExcelWriter(xlsx_buffer, engine='xlsxwriter') as writer:
+                    df.to_excel(writer, index=False, sheet_name='Welfare Indicators')
+                st.download_button("⬇️ Download Excel", data=xlsx_buffer.getvalue(), file_name=f"{st.session_state.group}_welfare.xlsx", mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+                st.session_state.recording_started = False
+                st.stop()
+
+        if "Production Data" in st.session_state.data_types:
+            st.subheader("📏 Production Data Entry")
+
+            if st.button("🔙 Go Back to Selection"):
+                st.session_state.recording_started = False
+                st.rerun()
+
+            entries = []
+            form = st.form("production_form")
+            with form:
+                for i in range(1, int(st.session_state.max_fish) + 1):
+                    col1, col2, col3 = st.columns(3)
+                    length = col1.number_input(f"Length (cm) - Fish {i}", min_value=0.0, step=0.1, key=f"len_{i}")
+                    weight = col2.number_input(f"Weight (g) - Fish {i}", min_value=0.0, step=0.1, key=f"wt_{i}")
+                    cf = round((100 * weight) / (length ** 3), 2) if length > 0 else 0
+                    col3.write(f"CF: {cf}")
+                    entries.append({"Fish": i, "Length (cm)": length, "Weight (g)": weight, "Condition Factor": cf})
+                submit = form.form_submit_button("Submit Production Data")
+
+            if submit:
+                df = pd.DataFrame(entries)
+                df.insert(0, "Group", st.session_state.group)
+                df.insert(1, "Date", st.session_state.date)
+                st.success("✅ Production data recorded!")
+                st.dataframe(df)
+                csv = df.to_csv(index=False).encode('utf-8')
+                st.download_button("⬇️ Download CSV", data=csv, file_name=f"{st.session_state.group}_production.csv", mime='text/csv')
+                xlsx_buffer = BytesIO()
+                with pd.ExcelWriter(xlsx_buffer, engine='xlsxwriter') as writer:
+                    df.to_excel(writer, index=False, sheet_name='Production Data')
+                st.download_button("⬇️ Download Excel", data=xlsx_buffer.getvalue(), file_name=f"{st.session_state.group}_production.xlsx", mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+                st.session_state.recording_started = False
+                st.stop()
 
         if "Water Quality" in st.session_state.data_types:
-            st.markdown("### 🌊 Water Quality Data Entry")
-            num_locations = st.number_input("Number of Locations / Cages", min_value=1, max_value=20, step=1, key="loc_num")
-            form = st.form("water_quality_form")
-            with form:
-                for i in range(1, num_locations + 1):
-                    st.markdown(f"**Location / Cage {i}**")
-                    col1, col2, col3, col4 = st.columns(4)
-                    location = col1.text_input("Location ID", key=f"loc_{i}")
-                    do = col2.number_input("Dissolved Oxygen (mg/L)", min_value=0.0, step=0.1, key=f"do_{i}")
+            st.subheader("🌊 Water Quality Data Entry")
+
+            if st.button("🔙 Go Back to Selection"):
+                st.session_state.recording_started = False
+                st.rerun()
+
+            num_locations = st.number_input("Number of Locations / Cages", min_value=1, max_value=20, step=1)
+            entries = []
+            with st.form("water_quality_form"):
+                for i in range(1, int(num_locations) + 1):
+                    col1, col2, col3, col4, col5 = st.columns(5)
+                    location = col1.text_input(f"Location/Cage {i}", key=f"loc_{i}")
+                    do = col2.number_input("DO (mg/L)", min_value=0.0, step=0.1, key=f"do_{i}")
                     ph = col3.number_input("pH", min_value=0.0, step=0.1, key=f"ph_{i}")
-                    temp = col4.number_input("Temperature (°C)", min_value=-2.0, step=0.1, key=f"temp_{i}")
-                    sal = st.number_input("Salinity (ppt)", min_value=0.0, step=0.1, key=f"sal_{i}")
+                    temp = col4.number_input("Temp (°C)", min_value=-2.0, step=0.1, key=f"temp_{i}")
+                    sal = col5.number_input("Salinity (ppt)", min_value=0.0, step=0.1, key=f"sal_{i}")
                     entries.append({"Location": location, "Dissolved Oxygen (mg/L)": do, "pH": ph, "Temperature (°C)": temp, "Salinity (ppt)": sal})
-
                 submit = st.form_submit_button("Submit Water Quality Data")
-                if submit:
-                    df = pd.DataFrame(entries)
-                    df.insert(0, "Group", st.session_state.group)
-                    df.insert(1, "Date", st.session_state.date)
-                    st.success("✅ Water quality data recorded!")
-                    st.dataframe(df)
 
-                    csv = df.to_csv(index=False).encode('utf-8')
-                    st.download_button("⬇️ Download CSV", data=csv, file_name=f"{st.session_state.group}_water_quality.csv", mime='text/csv')
+            if submit:
+                df = pd.DataFrame(entries)
+                df.insert(0, "Group", st.session_state.group)
+                df.insert(1, "Date", st.session_state.date)
+                st.success("✅ Water quality data recorded!")
+                st.dataframe(df)
+                csv = df.to_csv(index=False).encode('utf-8')
+                st.download_button("⬇️ Download CSV", data=csv, file_name=f"{st.session_state.group}_water_quality.csv", mime='text/csv')
+                xlsx_buffer = BytesIO()
+                with pd.ExcelWriter(xlsx_buffer, engine='xlsxwriter') as writer:
+                    df.to_excel(writer, index=False, sheet_name='Water Quality')
+                st.download_button("⬇️ Download Excel", data=xlsx_buffer.getvalue(), file_name=f"{st.session_state.group}_water_quality.xlsx", mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+                st.session_state.recording_started = False
+                st.stop()
 
-                    xlsx_buffer = BytesIO()
-                    with pd.ExcelWriter(xlsx_buffer, engine='xlsxwriter') as writer:
-                        df.to_excel(writer, index=False, sheet_name='Water Quality')
-                    st.download_button("⬇️ Download Excel", data=xlsx_buffer.getvalue(), file_name=f"{st.session_state.group}_water_quality.xlsx", mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-
-            st.stop()
-
-        form = st.form("bulk_entry_form")
-        st.markdown("### 📏 Select Units for Length and Weight")
-        length_unit = st.radio("Length Unit", ["cm", "inch"], horizontal=True)
-        weight_unit = st.radio("Weight Unit", ["g", "kg"], horizontal=True)
-
-        cols = ["Fish"] + st.session_state.welfare_indicators
-        if "Production Data" in st.session_state.data_types:
-            cols += [f"Length ({length_unit})", f"Weight ({weight_unit})", "Condition Factor"]
         if "Lice Count" in st.session_state.data_types:
-            cols.append("Lice Count")
+            st.subheader("🪱 Lice Count Data Entry")
 
-        st.markdown("### 🐟 Enter Scores Below")
-        st.write("Note: Condition Factor (CF) = (Weight in g * 100) / Length³ in cm")
+            if st.button("🔙 Go Back to Selection"):
+                st.session_state.recording_started = False
+                st.rerun()
 
-        for i in range(1, int(st.session_state.max_fish) + 1):
-            row = {"Fish": i}
-            num_cols = len(cols)
-            cols_display = st.columns(num_cols)
-            cols_display[0].write(f"{i}")
+            lice_stages = ["Sessile", "Pre-Adult I", "Pre-Adult II", "Adult Male", "Adult Female"]
+            entries = []
+            form = st.form("lice_form")
+            with form:
+                for i in range(1, int(st.session_state.max_fish) + 1):
+                    row = {"Fish": i}
+                    cols = st.columns(len(lice_stages) + 1)
+                    cols[0].write(f"Fish {i}")
+                    for j, stage in enumerate(lice_stages):
+                        row[stage] = cols[j + 1].number_input(f"{stage} (Fish {i})", min_value=0, step=1, key=f"{stage}_{i}")
+                    entries.append(row)
+                submit = form.form_submit_button("Submit Lice Count Data")
 
-            col_offset = 1
-            for j, ind in enumerate(st.session_state.welfare_indicators):
-                row[ind] = cols_display[col_offset].selectbox(f"{ind} (Fish {i})", [0, 1, 2, 3], key=f"{ind}_{i}")
-                col_offset += 1
-
-            if "Production Data" in st.session_state.data_types:
-                length = cols_display[col_offset].number_input(f"Length ({length_unit}) (Fish {i})", min_value=0.0, step=0.1, key=f"len_{i}")
-                col_offset += 1
-                weight = cols_display[col_offset].number_input(f"Weight ({weight_unit}) (Fish {i})", min_value=0.0, step=0.1, key=f"wt_{i}")
-                col_offset += 1
-                length_cm = length * 2.54 if length_unit == "inch" else length
-                weight_g = weight * 1000 if weight_unit == "kg" else weight
-                cf = round((100 * weight_g) / (length_cm ** 3), 2) if length_cm > 0 else 0
-                cols_display[col_offset].write(f"CF: {cf}")
-                row[f"Length ({length_unit})"] = length
-                row[f"Weight ({weight_unit})"] = weight
-                row["Condition Factor"] = cf
-                col_offset += 1
-
-            if "Lice Count" in st.session_state.data_types:
-                row["Lice Count"] = cols_display[col_offset].number_input(f"Lice Count (Fish {i})", min_value=0, step=1, key=f"lice_{i}")
-
-            entries.append(row)
-
-        submit = form.form_submit_button("Submit All Data")
-        if submit:
-            df = pd.DataFrame(entries)
-            df.insert(0, "Group", st.session_state.group)
-            df.insert(1, "Date", st.session_state.date)
-            st.session_state.fish_data = df
-            st.success("✅ All fish data recorded!")
-            st.dataframe(df)
-            csv = df.to_csv(index=False).encode('utf-8')
-            st.download_button("⬇️ Download CSV", data=csv, file_name=f"{st.session_state.group}_fish_data.csv", mime='text/csv')
-            xlsx_buffer = BytesIO()
-            with pd.ExcelWriter(xlsx_buffer, engine='xlsxwriter') as writer:
-                df.to_excel(writer, index=False, sheet_name='Fish Data')
-            st.download_button("⬇️ Download Excel", data=xlsx_buffer.getvalue(), file_name=f"{st.session_state.group}_fish_data.xlsx", mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-            st.session_state.recording_started = False
+            if submit:
+                df = pd.DataFrame(entries)
+                df.insert(0, "Group", st.session_state.group)
+                df.insert(1, "Date", st.session_state.date)
+                st.success("✅ Lice count data recorded!")
+                st.dataframe(df)
+                csv = df.to_csv(index=False).encode('utf-8')
+                st.download_button("⬇️ Download CSV", data=csv, file_name=f"{st.session_state.group}_lice.csv", mime='text/csv')
+                xlsx_buffer = BytesIO()
+                with pd.ExcelWriter(xlsx_buffer, engine='xlsxwriter') as writer:
+                    df.to_excel(writer, index=False, sheet_name='Lice Count')
+                st.download_button("⬇️ Download Excel", data=xlsx_buffer.getvalue(), file_name=f"{st.session_state.group}_lice.xlsx", mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+                st.session_state.recording_started = False
+                st.stop()
 
 # 🏠 Home Page
 elif page == "🏠 Home":
